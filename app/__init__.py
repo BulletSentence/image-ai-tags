@@ -62,19 +62,24 @@ def create_app() -> Flask:
         out_path = os.path.join(app.config["WORK_DIR"], f"{base}_clean{ext}")
         try:
             cleaner.clean(path, out_path)
+        except cleaner.ExifToolNotFound as err:
+            _safe_remove(path); _safe_remove(out_path)
+            return jsonify({"error": str(err)}), 503
+        except Exception as err:
+            _safe_remove(path); _safe_remove(out_path)
+            return jsonify({"error": str(err)}), 500
+
+        try:
             original_name = secure_filename(request.files["image"].filename)
             name, ext2 = os.path.splitext(original_name)
             download_name = f"{name or 'imagem'}_limpa{ext2 or ext}"
-            response = send_file(
-                out_path,
-                as_attachment=True,
-                download_name=download_name,
-            )
-            # Remove o arquivo de saída depois que a resposta for enviada.
-            response.call_on_close(lambda: _safe_remove(out_path))
+            response = send_file(out_path, as_attachment=True, download_name=download_name)
+            # Remove os arquivos temporários depois que a resposta for enviada.
+            response.call_on_close(lambda: (_safe_remove(out_path), _safe_remove(path)))
             return response
-        finally:
-            _safe_remove(path)
+        except Exception:
+            _safe_remove(path); _safe_remove(out_path)
+            raise
 
     @app.errorhandler(cleaner.ExifToolNotFound)
     def _no_exiftool(err):
