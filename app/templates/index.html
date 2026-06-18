@@ -3,192 +3,230 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Removedor de tags de IA</title>
+  <title>Removedor de Tags de IA</title>
   <style>
     :root {
-      --bg: #f1f3f4;
-      --surface: #ffffff;
-      --ink: #202124;
-      --ink-soft: #5f6368;
-      --line: #dadce0;
-      --blue: #1a73e8;
-      --blue-dark: #1b66c9;
+      --ink: #1b1b1b;
+      --ink-soft: #5a5a5a;
+      --line: #d0d0d0;
+      --blue: #1567e0;
+      --blue-dark: #0a53c8;
       --red: #d93025;
-      --green: #188038;
+      --green: #1a7d2f;
+      --chrome: #eef1f5;     /* cor do "metal" da janela */
+      --canvas: #fbfbfd;     /* área de conteúdo */
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
     body {
-      font-family: "Google Sans", "Roboto", "Segoe UI", system-ui, Arial, sans-serif;
-      color: var(--ink); background: var(--bg);
-      line-height: 1.55; -webkit-font-smoothing: antialiased;
+      font-family: Tahoma, "Segoe UI", system-ui, Arial, sans-serif;
+      color: var(--ink); min-height: 100vh; padding: 26px 16px 40px;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(255,255,255,.35), transparent 60%),
+        linear-gradient(135deg, #8ec5fc 0%, #a9a4f5 45%, #e0a9d8 100%);
+      -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
 
-    header { text-align: center; margin-bottom: 30px; }
-    h1 {
-      font-weight: 500; font-size: 2.3rem; line-height: 1.15; margin: 0 0 12px;
-      letter-spacing: -.015em;
+    /* ---------------- Janela do "SO" ---------------- */
+    .window {
+      max-width: 980px; margin: 0 auto; background: var(--chrome);
+      border: 1px solid #2a4d8f; border-radius: 9px 9px 7px 7px;
+      box-shadow: 0 22px 60px rgba(20,30,60,.45), 0 2px 0 rgba(255,255,255,.6) inset;
+      overflow: hidden;
     }
+    .titlebar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 6px 8px 6px 11px; color: #fff;
+      background: linear-gradient(180deg, #4a93ff 0%, #1f74e6 9%, #0d57cf 55%, #0a53c8 100%);
+      border-bottom: 1px solid #0a3d91;
+    }
+    .titlebar .title { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: .92rem; text-shadow: 0 1px 1px rgba(0,0,0,.45); letter-spacing: .01em; }
+    .appicon {
+      width: 18px; height: 18px; border-radius: 4px; position: relative; overflow: hidden;
+      background: linear-gradient(180deg, #cfeaff, #8ec6ff); border: 1px solid #fff;
+    }
+    .appicon::before { content: ""; position: absolute; left: 3px; top: 3px; width: 5px; height: 5px; border-radius: 50%; background: #ffe24d; }
+    .appicon::after  { content: ""; position: absolute; left: -2px; bottom: -1px; width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 7px solid #2e7d32; }
+
+    .winbtns { display: flex; gap: 4px; }
+    .winbtn {
+      width: 22px; height: 20px; border-radius: 4px; position: relative; cursor: default; padding: 0;
+      border: 1px solid rgba(255,255,255,.55); background: linear-gradient(180deg, #5aa0ff, #1567e0);
+      box-shadow: 0 1px 0 rgba(255,255,255,.4) inset;
+    }
+    .winbtn.close { background: linear-gradient(180deg, #ff8a7a, #e23b2e); }
+    .winbtn::before, .winbtn::after { content: ""; position: absolute; }
+    .winbtn.min::before { left: 5px; right: 5px; bottom: 4px; height: 2px; background: #fff; }
+    .winbtn.max::before { left: 5px; right: 5px; top: 4px; bottom: 4px; border: 2px solid #fff; border-top-width: 3px; border-radius: 1px; }
+    .winbtn.close::before, .winbtn.close::after { left: 50%; top: 50%; width: 12px; height: 2px; background: #fff; border-radius: 1px; }
+    .winbtn.close::before { transform: translate(-50%,-50%) rotate(45deg); }
+    .winbtn.close::after  { transform: translate(-50%,-50%) rotate(-45deg); }
+
+    .menubar { display: flex; gap: 1px; background: var(--chrome); padding: 3px 7px; border-bottom: 1px solid #cdd3db; font-size: .82rem; }
+    .menubar span { padding: 3px 10px; border-radius: 4px; color: #2a2a2a; cursor: default; }
+    .menubar span:hover { background: #d7e6ff; }
+
+    .window-body { background: var(--canvas); padding: 30px 26px 34px; }
+
+    .statusbar { display: flex; gap: 4px; background: var(--chrome); border-top: 1px solid #cdd3db; padding: 4px 5px; font-size: .76rem; color: #3a3a3a; }
+    .statusbar .cell { padding: 2px 9px; background: var(--chrome); box-shadow: inset 1px 1px 0 #c2c8d2, inset -1px -1px 0 #fff; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .statusbar .cell.grow { flex: 1; }
+
+    /* ---------------- Conteúdo ---------------- */
+    header { text-align: center; margin-bottom: 24px; }
+    h1 { font-weight: 700; font-size: 1.9rem; line-height: 1.15; margin: 0 0 10px; letter-spacing: -.01em; }
     h1 .scratch { position: relative; white-space: nowrap; }
-    h1 .scratch::after {
-      content: ""; position: absolute; left: -3%; right: -3%; top: 54%; height: 4px;
-      background: var(--red); transform: rotate(-1.6deg); border-radius: 3px;
-    }
-    .lede { color: var(--ink-soft); max-width: 56ch; margin: 0 auto; font-size: 1.02rem; }
+    h1 .scratch::after { content: ""; position: absolute; left: -3%; right: -3%; top: 54%; height: 4px; background: var(--red); transform: rotate(-1.6deg); border-radius: 3px; }
+    .lede { color: var(--ink-soft); max-width: 56ch; margin: 0 auto; font-size: .98rem; }
 
-    .notes { max-width: 640px; margin: 22px auto 0; display: grid; gap: 10px; }
-    .note {
-      text-align: left; background: var(--surface); border: 1px solid var(--line);
-      border-radius: 14px; padding: 12px 16px; color: var(--ink-soft); font-size: .86rem;
-    }
+    .notes { max-width: 600px; margin: 18px auto 0; display: grid; gap: 9px; }
+    .note { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; color: var(--ink-soft); font-size: .85rem; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
     .note.danger { border-color: #f3c0bc; background: #fdeeed; color: #b3261e; }
     .note b { color: var(--ink); }
     .note.danger b { color: #8c1d18; }
 
-    /* ---------- Dropzone ---------- */
+    /* Dropzone — área "tela" rebaixada */
     #drop {
-      margin: 34px auto 0; max-width: 640px; cursor: pointer; text-align: center;
-      background: var(--surface); border: 2px dashed var(--line); border-radius: 28px;
-      padding: 52px 28px; transition: .18s;
+      margin: 28px auto 0; max-width: 600px; cursor: pointer; text-align: center;
+      background: #fff; border: 2px dashed #b9c2cf; border-radius: 10px;
+      padding: 46px 26px; transition: .15s;
+      box-shadow: inset 0 2px 6px rgba(20,30,60,.07);
     }
-    #drop.over { border-color: var(--blue); background: #f6faff; }
-    #drop .big { font-size: 1.08rem; font-weight: 500; }
+    #drop.over { border-color: var(--blue); background: #f4f9ff; }
+    #drop .big { font-size: 1.04rem; font-weight: 700; }
     #drop .big u { text-decoration-color: var(--blue); text-underline-offset: 3px; color: var(--blue); }
-    #drop .hint { color: var(--ink-soft); font-size: .82rem; margin-top: 8px; }
+    #drop .hint { color: var(--ink-soft); font-size: .8rem; margin-top: 8px; }
     input[type=file] { display: none; }
 
-    /* ---------- Veredito (chip, em fluxo — sem overflow) ---------- */
-    .verdict-row { text-align: center; margin-top: 34px; min-height: 34px; }
-    .verdict {
-      display: none; align-items: center; gap: 7px;
-      padding: 7px 18px; border-radius: 999px; font-size: .84rem; font-weight: 600;
-    }
-    .verdict.bad { background: #fce8e6; color: var(--red); }
-    .verdict.good { background: #e6f4ea; color: var(--green); }
+    .verdict-row { text-align: center; margin-top: 28px; min-height: 32px; }
+    .verdict { display: none; align-items: center; gap: 7px; padding: 6px 16px; border-radius: 6px; font-size: .83rem; font-weight: 700; border: 1px solid transparent; }
+    .verdict.bad { background: #fce8e6; color: var(--red); border-color: #f3c0bc; }
+    .verdict.good { background: #e6f4ea; color: var(--green); border-color: #b7dfc1; }
     .verdict .dotmark { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 
-    /* ---------- Stage (foto + anotações) ---------- */
     .stage-scroll { overflow-x: auto; }
-    .stage {
-      position: relative; margin: 0 auto;
-      display: flex; align-items: center; justify-content: center;
-      padding: 64px 148px;
-    }
-    /* Moldura Polaroid clássica: borda fina em cima/lados, larga embaixo. */
+    .stage { position: relative; margin: 0 auto; display: flex; align-items: center; justify-content: center; padding: 60px 146px; }
     .polaroid {
       position: relative; margin: 0; background: #fff;
-      padding: 14px 14px 52px; border-radius: 8px;
-      box-shadow: 0 14px 30px rgba(60,64,67,.30), 0 3px 8px rgba(60,64,67,.18);
+      padding: 14px 14px 50px; border-radius: 6px;
+      box-shadow: 0 14px 30px rgba(20,30,60,.32), 0 3px 8px rgba(20,30,60,.2);
       transform: rotate(-1.8deg); transition: transform .25s ease;
     }
     .polaroid:hover { transform: rotate(0deg); }
-    .polaroid img {
-      display: block; max-width: 320px; max-height: 320px; width: auto; height: auto;
-      border-radius: 3px; background: #f1f3f4;
-    }
+    .polaroid img { display: block; max-width: 320px; max-height: 320px; width: auto; height: auto; border-radius: 2px; background: #eef0f3; }
     .polaroid .caption {
-      position: absolute; left: 14px; right: 14px; bottom: 16px; text-align: center;
-      font-family: "Segoe Script", "Ink Free", "Bradley Hand", cursive;
-      color: #5f6368; font-size: .98rem; line-height: 1.1;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      position: absolute; left: 14px; right: 14px; bottom: 15px; text-align: center;
+      font-family: "Segoe Script", "Ink Free", "Bradley Hand", cursive; color: #5a5a5a; font-size: .98rem;
+      line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
-    .callout {
-      position: absolute; z-index: 4; max-width: 158px;
-      color: var(--red); font-size: .82rem; pointer-events: none;
-      text-shadow: 0 1px 0 var(--bg), 0 0 5px var(--bg);
-    }
+    .callout { position: absolute; z-index: 4; max-width: 158px; color: var(--red); font-size: .81rem; pointer-events: none; text-shadow: 0 1px 0 #fff, 0 0 5px #fff; }
     .callout .ct { display: block; font-weight: 700; }
-    .callout .cv { display: block; color: #a52714; font-size: .72rem; word-break: break-word; line-height: 1.3; }
+    .callout .cv { display: block; color: #a52714; font-size: .71rem; word-break: break-word; line-height: 1.3; }
 
-    /* ---------- Ações / tabela ---------- */
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
-    button {
-      font: inherit; font-weight: 600; cursor: pointer; border-radius: 999px;
-      padding: 11px 26px; transition: .15s; border: 1px solid transparent;
-    }
-    .btn-primary { background: var(--blue); color: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
-    .btn-primary:hover { background: var(--blue-dark); box-shadow: 0 1px 4px rgba(60,64,67,.4); }
-    .btn-ghost { background: var(--surface); color: var(--blue); border: 1px solid var(--line); }
-    .btn-ghost:hover { background: #f6faff; }
-    button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+    /* Botões estilo "SO" */
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+    button.act { font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; border-radius: 6px; padding: 8px 18px; transition: .12s; border: 1px solid #6f93c4; }
+    .btn-primary { background: linear-gradient(180deg, #5aa0ff, #1f74e6); color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 1px 2px rgba(0,0,0,.2); }
+    .btn-primary:hover { background: linear-gradient(180deg, #6aacff, #1567e0); }
+    .btn-ghost { background: linear-gradient(180deg, #ffffff, #e9eef6); color: var(--blue-dark); border-color: #9bb2d4; }
+    .btn-ghost:hover { background: linear-gradient(180deg, #ffffff, #dde8f8); }
+    button.act:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 
-    .errbox {
-      display: none; max-width: 640px; margin: 18px auto 0; border: 1px solid #f3c0bc;
-      background: #fdeeed; color: #b3261e; padding: 12px 16px; border-radius: 14px; font-size: .9rem;
-    }
+    .errbox { display: none; max-width: 600px; margin: 16px auto 0; border: 1px solid #f3c0bc; background: #fdeeed; color: #b3261e; padding: 11px 14px; border-radius: 8px; font-size: .88rem; }
 
-    details { margin: 28px auto 0; max-width: 720px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 4px 18px; }
-    summary { cursor: pointer; color: var(--ink-soft); font-size: .9rem; font-weight: 600; padding: 12px 0; }
+    details { margin: 26px auto 0; max-width: 700px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2px 16px; box-shadow: inset 0 1px 3px rgba(20,30,60,.05); }
+    summary { cursor: pointer; color: var(--ink-soft); font-size: .88rem; font-weight: 700; padding: 11px 0; }
     summary:hover { color: var(--ink); }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: .82rem; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { color: var(--ink-soft); font-weight: 600; }
-    td.tag { font-family: ui-monospace, "Roboto Mono", Consolas, monospace; white-space: nowrap; color: var(--ink-soft); }
-    tr.ai td.tag { color: var(--red); font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: .81rem; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #e6e6e6; vertical-align: top; }
+    th { color: var(--ink-soft); font-weight: 700; }
+    td.tag { font-family: ui-monospace, "Consolas", monospace; white-space: nowrap; color: var(--ink-soft); }
+    tr.ai td.tag { color: var(--red); font-weight: 700; }
     td.val { word-break: break-word; }
 
-    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid #fff6; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff6; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 700px) {
-      h1 { font-size: 1.8rem; }
-      .stage { padding: 56px 116px; }
+      h1 { font-size: 1.55rem; }
+      .stage { padding: 54px 112px; }
+      .window-body { padding: 22px 14px 26px; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Remova as <span class="scratch">marcas de IA</span> das suas imagens</h1>
-      <p class="lede">Detecta e apaga os metadados que IAs gravam nas imagens geradas</p>
-
-      <div class="notes">
-        {% if not exiftool_ok %}
-        <div class="note danger"><b>ExifTool não encontrado.</b> A inspeção e a limpeza não funcionam até instalar o binário (veja o README).</div>
-        {% endif %}
-        <div class="note">Marca d'água invisível nos <b>pixels</b> (ex.: o <b>SynthID</b> do Google) não é metadado e <b>não</b> é removida aqui.</div>
-      </div>
-    </header>
-
-    <div id="drop">
-      <div class="big">Arraste uma imagem ou <u>clique para escolher</u></div>
-      <div class="hint">JPG, PNG, WEBP, TIFF, HEIC — até 50 MB</div>
-      <input type="file" id="file" accept="image/*" />
-    </div>
-
-    <div class="errbox" id="errBox"></div>
-
-    <div class="verdict-row">
-      <span class="verdict" id="verdict"></span>
-    </div>
-
-    <div class="stage-scroll" id="stageScroll" style="display:none">
-      <div class="stage" id="stage">
-        <svg class="lines" id="lines">
-          <defs>
-            <marker id="arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto-start-reverse">
-              <path d="M0,0 L6.5,3 L0,6 Z" fill="#d93025"></path>
-            </marker>
-          </defs>
-        </svg>
-        <figure class="polaroid">
-          <img id="preview" alt="pré-visualização" />
-          <figcaption class="caption" id="caption"></figcaption>
-        </figure>
+  <div class="window">
+    <div class="titlebar">
+      <div class="title"><span class="appicon"></span> Removedor de Tags de IA</div>
+      <div class="winbtns">
+        <button class="winbtn min" type="button" aria-label="Minimizar"></button>
+        <button class="winbtn max" type="button" aria-label="Maximizar"></button>
+        <button class="winbtn close" type="button" aria-label="Fechar"></button>
       </div>
     </div>
 
-    <div class="actions" id="actions" style="display:none">
-      <button class="btn-ghost" id="btnInspect">Reinspecionar</button>
-      <button class="btn-primary" id="btnClean">Limpar metadados e baixar</button>
+    <div class="menubar">
+      <span>Arquivo</span><span>Editar</span><span>Imagem</span><span>Ferramentas</span><span>Ajuda</span>
     </div>
 
-    <details id="allDetails" style="display:none">
-      <summary>Ver todos os metadados (<span id="allCount">0</span>)</summary>
-      <table><tbody id="allBody"></tbody></table>
-    </details>
+    <div class="window-body">
+      <header>
+        <h1>Remova as <span class="scratch">marcas de IA</span> das suas imagens</h1>
+        <p class="lede">Detecta e apaga os metadados que IAs gravam nas imagens geradas.</p>
+
+        <div class="notes">
+          {% if not exiftool_ok %}
+          <div class="note danger"><b>ExifTool não encontrado.</b> A inspeção e a limpeza não funcionam até instalar o binário (veja o README).</div>
+          {% endif %}
+          <div class="note">Marca d'água invisível nos <b>pixels</b> (ex.: o <b>SynthID</b> do Google) não é metadado e <b>não</b> é removida aqui.</div>
+        </div>
+      </header>
+
+      <div id="drop">
+        <div class="big">Arraste uma imagem ou <u>clique para escolher</u></div>
+        <div class="hint">JPG, PNG, WEBP, TIFF, HEIC — até 50 MB</div>
+        <input type="file" id="file" accept="image/*" />
+      </div>
+
+      <div class="errbox" id="errBox"></div>
+
+      <div class="verdict-row">
+        <span class="verdict" id="verdict"></span>
+      </div>
+
+      <div class="stage-scroll" id="stageScroll" style="display:none">
+        <div class="stage" id="stage">
+          <svg class="lines" id="lines">
+            <defs>
+              <marker id="arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto-start-reverse">
+                <path d="M0,0 L6.5,3 L0,6 Z" fill="#d93025"></path>
+              </marker>
+            </defs>
+          </svg>
+          <figure class="polaroid">
+            <img id="preview" alt="pré-visualização" />
+            <figcaption class="caption" id="caption"></figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <div class="actions" id="actions" style="display:none">
+        <button class="act btn-ghost" id="btnInspect">Reinspecionar</button>
+        <button class="act btn-primary" id="btnClean">Limpar metadados e baixar</button>
+      </div>
+
+      <details id="allDetails" style="display:none">
+        <summary>Ver todos os metadados (<span id="allCount">0</span>)</summary>
+        <table><tbody id="allBody"></tbody></table>
+      </details>
+    </div>
+
+    <div class="statusbar">
+      <div class="cell grow" id="statusText">Pronto.</div>
+      <div class="cell">ExifTool: {{ 'pronto' if exiftool_ok else 'ausente' }}</div>
+      <div class="cell">100%</div>
+    </div>
   </div>
 
   <script>
@@ -207,23 +245,25 @@
     const allBody = document.getElementById('allBody');
     const allCount = document.getElementById('allCount');
     const errBox = document.getElementById('errBox');
+    const statusText = document.getElementById('statusText');
 
     const SVGNS = 'http://www.w3.org/2000/svg';
     const RED = '#d93025';
-    // Slots ao redor da imagem (ângulos, y para baixo): laterais e cantos.
     const SLOTS = [180, 0, -52, -128, 52, 128, -90, 90].map(d => d * Math.PI / 180);
     const MAX_LABELS = 6;
 
     let currentFile = null;
     let currentMarkers = [];
 
-    function showError(msg) { errBox.textContent = msg; errBox.style.display = 'block'; }
+    function showError(msg) { errBox.textContent = msg; errBox.style.display = 'block'; setStatus('Erro: ' + msg); }
     function clearError() { errBox.style.display = 'none'; }
+    function setStatus(t) { statusText.textContent = t; }
     function setVerdict(cls, text) {
       verdict.className = 'verdict ' + cls;
       verdict.innerHTML = '<span class="dotmark"></span>' + esc(text);
       verdict.style.display = 'inline-flex';
     }
+    function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 
     function setFile(f) {
       currentFile = f;
@@ -234,6 +274,7 @@
       actions.style.display = 'flex';
       allDetails.style.display = 'none';
       verdict.style.display = 'none';
+      setStatus(f.name + ' — ' + fmtSize(f.size));
       clearCallouts();
       inspect();
     }
@@ -248,6 +289,7 @@
       clearError();
       btnInspect.disabled = btnClean.disabled = true;
       setVerdict('good', 'lendo metadados…');
+      setStatus('Lendo metadados…');
       try {
         const fd = new FormData();
         fd.append('image', currentFile);
@@ -265,8 +307,13 @@
     function renderResult(data) {
       currentMarkers = (data.ai_markers || []).slice(0, MAX_LABELS);
 
-      if (data.has_ai_markers) setVerdict('bad', data.ai_markers.length + ' marca(s) de IA');
-      else setVerdict('good', 'nenhuma marca de IA óbvia');
+      if (data.has_ai_markers) {
+        setVerdict('bad', data.ai_markers.length + ' marca(s) de IA');
+        setStatus(data.ai_markers.length + ' marca(s) de IA encontrada(s) em ' + (data.total_tags || 0) + ' tags.');
+      } else {
+        setVerdict('good', 'nenhuma marca de IA óbvia');
+        setStatus('Nenhuma marca de IA óbvia. ' + (data.total_tags || 0) + ' tags lidas.');
+      }
 
       const entries = Object.entries(data.all_tags || {});
       allCount.textContent = data.total_tags || entries.length;
@@ -373,6 +420,7 @@
       btnInspect.disabled = btnClean.disabled = true;
       const original = btnClean.textContent;
       btnClean.innerHTML = '<span class="spinner"></span> Limpando…';
+      setStatus('Limpando metadados…');
       try {
         const fd = new FormData();
         fd.append('image', currentFile);
@@ -385,10 +433,12 @@
         const blob = await res.blob();
         const cd = res.headers.get('Content-Disposition') || '';
         const match = cd.match(/filename="?([^"]+)"?/);
+        const name = match ? match[1] : 'imagem_limpa';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = match ? match[1] : 'imagem_limpa'; a.click();
+        a.href = url; a.download = name; a.click();
         URL.revokeObjectURL(url);
+        setStatus('Imagem limpa e baixada: ' + name);
       } catch (err) {
         showError(err.message);
       } finally {
