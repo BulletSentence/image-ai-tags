@@ -133,6 +133,16 @@
     .btn-ghost:hover { background: linear-gradient(180deg, #ffffff, #dde8f8); }
     button.act:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 
+    /* Limpeza profunda (re-processamento de pixels) */
+    .deepclean { display: none; max-width: 600px; margin: 22px auto 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; box-shadow: inset 0 1px 3px rgba(20,30,60,.05); }
+    .dc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .dc-head label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+    .dc-head input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); }
+    .dc-head select { font: inherit; font-size: .84rem; padding: 4px 8px; border: 1px solid #9bb2d4; border-radius: 5px; background: linear-gradient(180deg,#fff,#eef3fa); }
+    .dc-head select:disabled { opacity: .5; }
+    .dc-note { margin: 9px 0 0; font-size: .8rem; color: var(--ink-soft); line-height: 1.45; }
+    .dc-note b { color: #b3261e; }
+
     .errbox { display: none; max-width: 600px; margin: 16px auto 0; border: 1px solid #f3c0bc; background: #fdeeed; color: #b3261e; padding: 11px 14px; border-radius: 8px; font-size: .88rem; }
 
     details { margin: 26px auto 0; max-width: 700px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2px 16px; box-shadow: inset 0 1px 3px rgba(20,30,60,.05); }
@@ -179,7 +189,7 @@
           {% if not exiftool_ok %}
           <div class="note danger"><b>ExifTool não encontrado.</b> A inspeção e a limpeza não funcionam até instalar o binário (veja o README).</div>
           {% endif %}
-          <div class="note">Marca d'água invisível nos <b>pixels</b> (ex.: o <b>SynthID</b> do Google) não é metadado e <b>não</b> é removida aqui.</div>
+          <div class="note">Marca d'água invisível nos <b>pixels</b> (ex.: <b>SynthID</b>) não é metadado: a <b>limpeza profunda</b> tenta quebrá-la re-processando os pixels — funciona em marcas frágeis, mas <b>marcas robustas como o SynthID podem sobreviver</b>.</div>
         </div>
       </header>
 
@@ -211,9 +221,21 @@
         </div>
       </div>
 
+      <div class="deepclean" id="deepClean">
+        <div class="dc-head">
+          <label><input type="checkbox" id="deepChk" /> Limpeza profunda — re-processar pixels</label>
+          <select id="strengthSel" disabled>
+            <option value="leve">Intensidade: leve</option>
+            <option value="medio" selected>Intensidade: média</option>
+            <option value="forte">Intensidade: forte</option>
+          </select>
+        </div>
+        <p class="dc-note">Aplica ruído, reamostragem e recompressão pra quebrar marcas d'água invisíveis frágeis. <b>Marcas robustas como o SynthID do Google são feitas pra sobreviver a isso e provavelmente NÃO serão removidas.</b> A imagem é levemente alterada (quanto maior a intensidade, mais perda).</p>
+      </div>
+
       <div class="actions" id="actions" style="display:none">
         <button class="act btn-ghost" id="btnInspect">Reinspecionar</button>
-        <button class="act btn-primary" id="btnClean">Limpar metadados e baixar</button>
+        <button class="act btn-primary" id="btnClean">Limpar e baixar</button>
       </div>
 
       <details id="allDetails" style="display:none">
@@ -246,6 +268,11 @@
     const allCount = document.getElementById('allCount');
     const errBox = document.getElementById('errBox');
     const statusText = document.getElementById('statusText');
+    const deepClean = document.getElementById('deepClean');
+    const deepChk = document.getElementById('deepChk');
+    const strengthSel = document.getElementById('strengthSel');
+
+    deepChk.addEventListener('change', () => { strengthSel.disabled = !deepChk.checked; });
 
     const SVGNS = 'http://www.w3.org/2000/svg';
     const RED = '#d93025';
@@ -272,6 +299,7 @@
       caption.textContent = f.name;
       stageScroll.style.display = 'block';
       actions.style.display = 'flex';
+      deepClean.style.display = 'block';
       allDetails.style.display = 'none';
       verdict.style.display = 'none';
       setStatus(f.name + ' — ' + fmtSize(f.size));
@@ -419,11 +447,13 @@
       clearError();
       btnInspect.disabled = btnClean.disabled = true;
       const original = btnClean.textContent;
-      btnClean.innerHTML = '<span class="spinner"></span> Limpando…';
-      setStatus('Limpando metadados…');
+      const deep = deepChk.checked;
+      btnClean.innerHTML = '<span class="spinner"></span> ' + (deep ? 'Re-processando…' : 'Limpando…');
+      setStatus(deep ? 'Limpeza profunda (re-processando pixels)…' : 'Limpando metadados…');
       try {
         const fd = new FormData();
         fd.append('image', currentFile);
+        if (deep) { fd.append('deep', '1'); fd.append('strength', strengthSel.value); }
         const res = await fetch('/clean', { method: 'POST', body: fd });
         if (!res.ok) {
           let msg = res.statusText;
