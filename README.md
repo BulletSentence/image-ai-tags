@@ -1,92 +1,134 @@
-# 🧼 image-ai-tags
+# image-ai-tags
 
-Monólito Python (Flask) que recebe uma imagem por uma página web, **inspeciona**
-e **remove os metadados/tags de IA** inseridos por geradores como Gemini,
-ChatGPT/DALL·E, Adobe Firefly, etc.
+A small Python monolith (Flask, front and back in the same project) that takes
+an image through a web page, **inspects** it, and **removes the AI provenance
+metadata** that generators such as Gemini, ChatGPT/DALL-E, and Adobe Firefly
+embed into images they create or edit.
 
-O que é removido:
+What gets removed:
 
-- **C2PA / "Content Credentials"** — manifests assinados em blocos JUMBF.
-- **XMP / IPTC `DigitalSourceType`** — ex.: `trainedAlgorithmicMedia`, `compositeSynthetic`.
-- **EXIF/XMP `Software` / `CreatorTool`** — ex.: "Gemini", "OpenAI", "Firefly".
-- Todo o restante dos metadados EXIF/XMP/IPTC (limpeza completa).
+- **C2PA / "Content Credentials"** — signed manifests stored in JUMBF blocks.
+- **XMP / IPTC `DigitalSourceType`** — e.g. `trainedAlgorithmicMedia`, `compositeSynthetic`.
+- **EXIF/XMP `Software` / `CreatorTool` / `Creator` / `Credit`** — e.g. "Gemini", "OpenAI", "Firefly", "Made with Google AI".
+- Everything else in the EXIF/XMP/IPTC blocks (a full metadata strip).
 
-> ⚠️ **Limitação:** marca d'água invisível embutida nos **pixels** (ex.: o
-> **SynthID** do Google) **não** é metadado e **não** é removida — só sairia
-> re-encodando/degradando a própria imagem.
+> **Limitation:** an invisible watermark embedded in the **pixels** (for example
+> Google's **SynthID**) is not metadata and is **not** removed here. Stripping
+> metadata cannot touch it — that would require re-encoding/degrading the image
+> itself.
+
+The original file is never modified: cleaning runs on a copy in a temporary
+directory, which is deleted after the response is sent.
 
 ---
 
-## Pré-requisitos
+## How it works
+
+1. **Inspect** — reads all metadata with `exiftool -G1 -j -a` and flags AI
+   markers: C2PA/JUMBF tags, `DigitalSourceType`, and `Software`/`CreatorTool`
+   values containing known AI tool names.
+2. **Clean** — runs `exiftool -all= -trailer:all= --jumbf:all` on a copy and
+   returns the stripped file for download.
+
+The metadata work is delegated to the **ExifTool** command-line binary, invoked
+through `subprocess`. There is no Python imaging dependency.
+
+---
+
+## Requirements
 
 ### 1. Python 3.10+
-Já instalado (3.12).
 
-### 2. ExifTool (binário externo — instalar manualmente)
+### 2. ExifTool (external binary, installed manually)
 
-O projeto chama o `exiftool` via linha de comando. Escolha uma opção:
+The app calls the `exiftool` command. Pick one option:
 
-**Windows (recomendado — instalador/standalone):**
-1. Baixe o "Windows Executable" em <https://exiftool.org>.
-2. Extraia e **renomeie** `exiftool(-k).exe` para `exiftool.exe`.
-3. Coloque numa pasta do `PATH` (ex.: `C:\Windows`) **ou** aponte via variável:
+**Windows (standalone executable):**
+1. Download the "Windows Executable" from https://exiftool.org.
+2. Extract it and rename `exiftool(-k).exe` to `exiftool.exe`.
+3. Put it on a folder in your `PATH` (e.g. `C:\Windows`), or point the app at it
+   with an environment variable:
    ```powershell
-   $env:EXIFTOOL_PATH = "C:\ferramentas\exiftool.exe"
+   $env:EXIFTOOL_PATH = "C:\exiftool-13.59_64\exiftool.exe"
    ```
 
-**Via gerenciador de pacotes (se tiver):**
+**Via a package manager (if available):**
 ```powershell
 winget install OliverBetz.ExifTool
-# ou
+# or
 choco install exiftool
 ```
 
-Confirme:
+Verify:
 ```powershell
 exiftool -ver
 ```
 
+> The app resolves ExifTool from the `EXIFTOOL_PATH` environment variable, or
+> from `exiftool` on the `PATH` if that variable is not set. The home page shows
+> a warning when the binary cannot be found.
+
 ---
 
-## Como rodar
+## Setup and run
 
+**PowerShell:**
 ```powershell
-# 1. (opcional) ambiente virtual
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
-# 2. dependências Python
 pip install -r requirements.txt
 
-# 3. subir o app
+$env:EXIFTOOL_PATH = "C:\exiftool-13.59_64\exiftool.exe"
 python run.py
 ```
 
-Acesse <http://127.0.0.1:5000>.
+**Git Bash:**
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+pip install -r requirements.txt
+
+export EXIFTOOL_PATH="C:\exiftool-13.59_64\exiftool.exe"
+python run.py
+```
+
+Then open http://127.0.0.1:5000.
+
+> If you set `EXIFTOOL_PATH` as a permanent user environment variable, new
+> terminals will pick it up automatically and the `export`/`$env:` line is no
+> longer needed.
 
 ---
 
-## Estrutura
+## Project layout
 
 ```
 image-ai-tags/
-├── run.py                  # ponto de entrada (dev server)
-├── requirements.txt        # deps Python (só Flask)
-├── README.md
-├── .gitignore
-└── app/
-    ├── __init__.py         # app factory + rotas (/, /inspect, /clean)
-    ├── cleaner.py          # integração com ExifTool (inspeção + limpeza)
-    └── templates/
-        └── index.html      # front (HTML+CSS+JS inline)
+  run.py                 entry point (dev server)
+  requirements.txt       Python dependencies (Flask only)
+  README.md
+  .gitignore
+  app/
+    __init__.py          app factory and routes (/, /inspect, /clean)
+    cleaner.py           ExifTool integration (inspect and clean)
+    templates/
+      index.html         frontend (HTML + CSS + JS, inline)
 ```
 
-## Rotas
+## Routes
 
-| Método | Rota       | Descrição                                              |
-|--------|------------|--------------------------------------------------------|
-| GET    | `/`        | Página de upload.                                      |
-| POST   | `/inspect` | Recebe `image`, devolve JSON com metadados + marcadores de IA detectados. |
-| POST   | `/clean`   | Recebe `image`, devolve o arquivo limpo para download. |
+| Method | Route      | Description                                                            |
+|--------|------------|------------------------------------------------------------------------|
+| GET    | `/`        | Upload page.                                                           |
+| POST   | `/inspect` | Receives `image`, returns JSON with all metadata and detected AI markers. |
+| POST   | `/clean`   | Receives `image`, returns the cleaned file as a download.             |
 
-A imagem original nunca é alterada — a limpeza é feita sobre uma cópia em diretório temporário, que é removida após o envio.
+## Technologies
+
+- **Backend:** Python 3.10+, Flask
+- **Metadata engine:** ExifTool (external binary, called via `subprocess`)
+- **Frontend:** HTML, CSS, and vanilla JavaScript served through a Jinja2 template
+
+## Supported formats
+
+JPEG, PNG, WEBP, TIFF, HEIC/HEIF. Maximum upload size: 50 MB.

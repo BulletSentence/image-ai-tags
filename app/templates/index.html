@@ -3,192 +3,373 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Limpar tags de IA das imagens</title>
+  <title>Removedor de tags de IA</title>
   <style>
     :root {
-      --bg: #0f1115; --card: #1a1d24; --line: #2a2f3a;
-      --txt: #e6e9ef; --muted: #9aa3b2; --accent: #5b8cff;
-      --danger: #ff6b6b; --ok: #3ddc97;
+      --bg: #f1f3f4;
+      --surface: #ffffff;
+      --ink: #202124;
+      --ink-soft: #5f6368;
+      --line: #dadce0;
+      --blue: #1a73e8;
+      --blue-dark: #1b66c9;
+      --red: #d93025;
+      --green: #188038;
     }
     * { box-sizing: border-box; }
+    html, body { margin: 0; }
     body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg); color: var(--txt); line-height: 1.5;
+      font-family: "Google Sans", "Roboto", "Segoe UI", system-ui, Arial, sans-serif;
+      color: var(--ink); background: var(--bg);
+      line-height: 1.55; -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 64px; }
-    h1 { font-size: 1.6rem; margin: 0 0 4px; }
-    .sub { color: var(--muted); margin: 0 0 24px; font-size: .95rem; }
-    .warn {
-      background: #2a1f12; border: 1px solid #5a3d1a; color: #f0c987;
-      padding: 12px 14px; border-radius: 10px; font-size: .88rem; margin-bottom: 20px;
+    .wrap { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    header { text-align: center; margin-bottom: 30px; }
+    h1 {
+      font-weight: 500; font-size: 2.3rem; line-height: 1.15; margin: 0 0 12px;
+      letter-spacing: -.015em;
     }
-    .err {
-      background: #2a1216; border: 1px solid #5a1a22; color: #ff9ca6;
-      padding: 12px 14px; border-radius: 10px; font-size: .9rem; margin-bottom: 20px;
+    h1 .scratch { position: relative; white-space: nowrap; }
+    h1 .scratch::after {
+      content: ""; position: absolute; left: -3%; right: -3%; top: 54%; height: 4px;
+      background: var(--red); transform: rotate(-1.6deg); border-radius: 3px;
     }
+    .lede { color: var(--ink-soft); max-width: 56ch; margin: 0 auto; font-size: 1.02rem; }
+
+    .notes { max-width: 640px; margin: 22px auto 0; display: grid; gap: 10px; }
+    .note {
+      text-align: left; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 14px; padding: 12px 16px; color: var(--ink-soft); font-size: .86rem;
+    }
+    .note.danger { border-color: #f3c0bc; background: #fdeeed; color: #b3261e; }
+    .note b { color: var(--ink); }
+    .note.danger b { color: #8c1d18; }
+
+    /* ---------- Dropzone ---------- */
     #drop {
-      border: 2px dashed var(--line); border-radius: 14px; padding: 40px 20px;
-      text-align: center; cursor: pointer; transition: .15s; background: var(--card);
+      margin: 34px auto 0; max-width: 640px; cursor: pointer; text-align: center;
+      background: var(--surface); border: 2px dashed var(--line); border-radius: 28px;
+      padding: 52px 28px; transition: .18s;
     }
-    #drop.over { border-color: var(--accent); background: #1c2333; }
-    #drop strong { color: var(--accent); }
-    #drop .hint { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+    #drop.over { border-color: var(--blue); background: #f6faff; }
+    #drop .big { font-size: 1.08rem; font-weight: 500; }
+    #drop .big u { text-decoration-color: var(--blue); text-underline-offset: 3px; color: var(--blue); }
+    #drop .hint { color: var(--ink-soft); font-size: .82rem; margin-top: 8px; }
     input[type=file] { display: none; }
-    .file { margin-top: 16px; display: none; }
-    .file.show { display: block; }
-    .filename { font-weight: 600; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-    button {
-      font: inherit; font-weight: 600; border: none; border-radius: 10px;
-      padding: 11px 18px; cursor: pointer; transition: .15s;
+
+    /* ---------- Veredito (chip, em fluxo — sem overflow) ---------- */
+    .verdict-row { text-align: center; margin-top: 34px; min-height: 34px; }
+    .verdict {
+      display: none; align-items: center; gap: 7px;
+      padding: 7px 18px; border-radius: 999px; font-size: .84rem; font-weight: 600;
     }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { filter: brightness(1.1); }
-    .btn-ghost { background: transparent; color: var(--txt); border: 1px solid var(--line); }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    .panel { margin-top: 24px; display: none; }
-    .panel.show { display: block; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; }
-    .badge.bad { background: #3a1620; color: var(--danger); }
-    .badge.good { background: #143026; color: var(--ok); }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .85rem; }
+    .verdict.bad { background: #fce8e6; color: var(--red); }
+    .verdict.good { background: #e6f4ea; color: var(--green); }
+    .verdict .dotmark { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    /* ---------- Stage (foto + anotações) ---------- */
+    .stage-scroll { overflow-x: auto; }
+    .stage {
+      position: relative; margin: 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      padding: 64px 148px;
+    }
+    /* Moldura Polaroid clássica: borda fina em cima/lados, larga embaixo. */
+    .polaroid {
+      position: relative; margin: 0; background: #fff;
+      padding: 14px 14px 52px; border-radius: 8px;
+      box-shadow: 0 14px 30px rgba(60,64,67,.30), 0 3px 8px rgba(60,64,67,.18);
+      transform: rotate(-1.8deg); transition: transform .25s ease;
+    }
+    .polaroid:hover { transform: rotate(0deg); }
+    .polaroid img {
+      display: block; max-width: 320px; max-height: 320px; width: auto; height: auto;
+      border-radius: 3px; background: #f1f3f4;
+    }
+    .polaroid .caption {
+      position: absolute; left: 14px; right: 14px; bottom: 16px; text-align: center;
+      font-family: "Segoe Script", "Ink Free", "Bradley Hand", cursive;
+      color: #5f6368; font-size: .98rem; line-height: 1.1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+    .callout {
+      position: absolute; z-index: 4; max-width: 158px;
+      color: var(--red); font-size: .82rem; pointer-events: none;
+      text-shadow: 0 1px 0 var(--bg), 0 0 5px var(--bg);
+    }
+    .callout .ct { display: block; font-weight: 700; }
+    .callout .cv { display: block; color: #a52714; font-size: .72rem; word-break: break-word; line-height: 1.3; }
+
+    /* ---------- Ações / tabela ---------- */
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+    button {
+      font: inherit; font-weight: 600; cursor: pointer; border-radius: 999px;
+      padding: 11px 26px; transition: .15s; border: 1px solid transparent;
+    }
+    .btn-primary { background: var(--blue); color: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
+    .btn-primary:hover { background: var(--blue-dark); box-shadow: 0 1px 4px rgba(60,64,67,.4); }
+    .btn-ghost { background: var(--surface); color: var(--blue); border: 1px solid var(--line); }
+    .btn-ghost:hover { background: #f6faff; }
+    button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+    .errbox {
+      display: none; max-width: 640px; margin: 18px auto 0; border: 1px solid #f3c0bc;
+      background: #fdeeed; color: #b3261e; padding: 12px 16px; border-radius: 14px; font-size: .9rem;
+    }
+
+    details { margin: 28px auto 0; max-width: 720px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 4px 18px; }
+    summary { cursor: pointer; color: var(--ink-soft); font-size: .9rem; font-weight: 600; padding: 12px 0; }
+    summary:hover { color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: .82rem; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { color: var(--muted); font-weight: 600; }
-    td.tag { font-family: ui-monospace, monospace; color: var(--accent); white-space: nowrap; }
-    tr.ai td.tag { color: var(--danger); }
-    .val { word-break: break-word; color: var(--txt); }
-    .reason { color: var(--muted); font-size: .8rem; }
-    details { margin-top: 16px; }
-    summary { cursor: pointer; color: var(--muted); }
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff5; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+    th { color: var(--ink-soft); font-weight: 600; }
+    td.tag { font-family: ui-monospace, "Roboto Mono", Consolas, monospace; white-space: nowrap; color: var(--ink-soft); }
+    tr.ai td.tag { color: var(--red); font-weight: 600; }
+    td.val { word-break: break-word; }
+
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid #fff6; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 700px) {
+      h1 { font-size: 1.8rem; }
+      .stage { padding: 56px 116px; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>🧼 Limpar tags de IA das imagens</h1>
-    <p class="sub">Remove metadados de proveniência (C2PA / Content Credentials), XMP/IPTC <code>DigitalSourceType</code> e marcas de software (Gemini, ChatGPT/DALL·E, Firefly…) inseridos em imagens geradas ou editadas por IA.</p>
+    <header>
+      <h1>Remova as <span class="scratch">marcas de IA</span> das suas imagens</h1>
+      <p class="lede">Detecta e apaga os metadados que IAs gravam nas imagens geradas</p>
 
-    {% if not exiftool_ok %}
-    <div class="err">
-      ⚠️ <strong>ExifTool não encontrado.</strong> A inspeção e a limpeza não vão funcionar até instalar o binário. Veja o <code>README.md</code>.
-    </div>
-    {% endif %}
-
-    <div class="warn">
-      ⓘ Marca d'água invisível nos <em>pixels</em> (ex.: <strong>SynthID</strong> do Google) <strong>não</strong> é metadado e não é removida aqui.
-    </div>
+      <div class="notes">
+        {% if not exiftool_ok %}
+        <div class="note danger"><b>ExifTool não encontrado.</b> A inspeção e a limpeza não funcionam até instalar o binário (veja o README).</div>
+        {% endif %}
+        <div class="note">Marca d'água invisível nos <b>pixels</b> (ex.: o <b>SynthID</b> do Google) não é metadado e <b>não</b> é removida aqui.</div>
+      </div>
+    </header>
 
     <div id="drop">
-      <div>Arraste uma imagem aqui ou <strong>clique para escolher</strong></div>
+      <div class="big">Arraste uma imagem ou <u>clique para escolher</u></div>
       <div class="hint">JPG, PNG, WEBP, TIFF, HEIC — até 50 MB</div>
       <input type="file" id="file" accept="image/*" />
     </div>
 
-    <div class="file" id="fileInfo">
-      <span class="filename" id="fileName"></span>
-      <div class="row">
-        <button class="btn-ghost" id="btnInspect">🔍 Inspecionar metadados</button>
-        <button class="btn-primary" id="btnClean">🧼 Limpar e baixar</button>
+    <div class="errbox" id="errBox"></div>
+
+    <div class="verdict-row">
+      <span class="verdict" id="verdict"></span>
+    </div>
+
+    <div class="stage-scroll" id="stageScroll" style="display:none">
+      <div class="stage" id="stage">
+        <svg class="lines" id="lines">
+          <defs>
+            <marker id="arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto-start-reverse">
+              <path d="M0,0 L6.5,3 L0,6 Z" fill="#d93025"></path>
+            </marker>
+          </defs>
+        </svg>
+        <figure class="polaroid">
+          <img id="preview" alt="pré-visualização" />
+          <figcaption class="caption" id="caption"></figcaption>
+        </figure>
       </div>
     </div>
 
-    <div class="err" id="errBox" style="display:none"></div>
-
-    <div class="panel" id="panel">
-      <div id="status"></div>
-      <table id="aiTable" style="display:none">
-        <thead><tr><th>Tag</th><th>Valor</th><th>Motivo</th></tr></thead>
-        <tbody id="aiBody"></tbody>
-      </table>
-      <details id="allDetails" style="display:none">
-        <summary>Ver todos os metadados (<span id="allCount">0</span>)</summary>
-        <table><tbody id="allBody"></tbody></table>
-      </details>
+    <div class="actions" id="actions" style="display:none">
+      <button class="btn-ghost" id="btnInspect">Reinspecionar</button>
+      <button class="btn-primary" id="btnClean">Limpar metadados e baixar</button>
     </div>
+
+    <details id="allDetails" style="display:none">
+      <summary>Ver todos os metadados (<span id="allCount">0</span>)</summary>
+      <table><tbody id="allBody"></tbody></table>
+    </details>
   </div>
 
   <script>
     const drop = document.getElementById('drop');
     const fileInput = document.getElementById('file');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileName = document.getElementById('fileName');
+    const stageScroll = document.getElementById('stageScroll');
+    const stage = document.getElementById('stage');
+    const preview = document.getElementById('preview');
+    const caption = document.getElementById('caption');
+    const lines = document.getElementById('lines');
+    const verdict = document.getElementById('verdict');
+    const actions = document.getElementById('actions');
     const btnInspect = document.getElementById('btnInspect');
     const btnClean = document.getElementById('btnClean');
-    const panel = document.getElementById('panel');
-    const status = document.getElementById('status');
-    const aiTable = document.getElementById('aiTable');
-    const aiBody = document.getElementById('aiBody');
     const allDetails = document.getElementById('allDetails');
     const allBody = document.getElementById('allBody');
     const allCount = document.getElementById('allCount');
     const errBox = document.getElementById('errBox');
 
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    const RED = '#d93025';
+    // Slots ao redor da imagem (ângulos, y para baixo): laterais e cantos.
+    const SLOTS = [180, 0, -52, -128, 52, 128, -90, 90].map(d => d * Math.PI / 180);
+    const MAX_LABELS = 6;
+
     let currentFile = null;
+    let currentMarkers = [];
+
+    function showError(msg) { errBox.textContent = msg; errBox.style.display = 'block'; }
+    function clearError() { errBox.style.display = 'none'; }
+    function setVerdict(cls, text) {
+      verdict.className = 'verdict ' + cls;
+      verdict.innerHTML = '<span class="dotmark"></span>' + esc(text);
+      verdict.style.display = 'inline-flex';
+    }
 
     function setFile(f) {
       currentFile = f;
-      fileName.textContent = '📄 ' + f.name + '  (' + (f.size / 1024).toFixed(0) + ' KB)';
-      fileInfo.classList.add('show');
-      panel.classList.remove('show');
-      errBox.style.display = 'none';
+      clearError();
+      preview.src = URL.createObjectURL(f);
+      caption.textContent = f.name;
+      stageScroll.style.display = 'block';
+      actions.style.display = 'flex';
+      allDetails.style.display = 'none';
+      verdict.style.display = 'none';
+      clearCallouts();
+      inspect();
     }
 
     drop.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
-    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
     drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
 
-    function showError(msg) {
-      errBox.textContent = '⚠️ ' + msg;
-      errBox.style.display = 'block';
-    }
-
-    btnInspect.addEventListener('click', async () => {
-      if (!currentFile) return;
-      errBox.style.display = 'none';
+    async function inspect() {
+      clearError();
       btnInspect.disabled = btnClean.disabled = true;
-      panel.classList.add('show');
-      status.innerHTML = '<span class="spinner"></span> Lendo metadados…';
-      aiTable.style.display = allDetails.style.display = 'none';
+      setVerdict('good', 'lendo metadados…');
       try {
         const fd = new FormData();
         fd.append('image', currentFile);
         const res = await fetch('/inspect', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error((await res.json()).error || res.statusText);
-        const data = await res.json();
-        render(data);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+        renderResult(await res.json());
       } catch (err) {
-        status.innerHTML = '';
+        verdict.style.display = 'none';
         showError(err.message);
       } finally {
         btnInspect.disabled = btnClean.disabled = false;
       }
-    });
+    }
 
-    function render(data) {
-      if (data.has_ai_markers) {
-        status.innerHTML = '<span class="badge bad">⚠ ' + data.ai_markers.length + ' marcador(es) de IA encontrado(s)</span>';
-        aiBody.innerHTML = data.ai_markers.map(m =>
-          '<tr class="ai"><td class="tag">' + esc(m.tag) + '</td><td class="val">' + esc(String(m.value)) + '</td><td class="reason">' + esc(m.reason) + '</td></tr>'
-        ).join('');
-        aiTable.style.display = 'table';
-      } else {
-        status.innerHTML = '<span class="badge good">✓ Nenhum marcador de IA óbvio</span>';
-        aiTable.style.display = 'none';
-      }
-      const entries = Object.entries(data.all_tags);
-      allCount.textContent = data.total_tags;
+    function renderResult(data) {
+      currentMarkers = (data.ai_markers || []).slice(0, MAX_LABELS);
+
+      if (data.has_ai_markers) setVerdict('bad', data.ai_markers.length + ' marca(s) de IA');
+      else setVerdict('good', 'nenhuma marca de IA óbvia');
+
+      const entries = Object.entries(data.all_tags || {});
+      allCount.textContent = data.total_tags || entries.length;
+      const aiTags = new Set((data.ai_markers || []).map(m => m.tag));
       allBody.innerHTML = entries.map(([k, v]) =>
-        '<tr><td class="tag">' + esc(k) + '</td><td class="val">' + esc(String(v)) + '</td></tr>'
+        `<tr class="${aiTags.has(k) ? 'ai' : ''}"><td class="tag">${esc(k)}</td><td class="val">${esc(String(v))}</td></tr>`
       ).join('');
       allDetails.style.display = entries.length ? 'block' : 'none';
+
+      scheduleDraw();
     }
+
+    function scheduleDraw() {
+      if (preview.complete && preview.naturalWidth) drawAnnotations();
+      else preview.addEventListener('load', drawAnnotations, { once: true });
+    }
+
+    function clearCallouts() {
+      stage.querySelectorAll('.callout').forEach(n => n.remove());
+      [...lines.querySelectorAll('path.conn, circle.dot')].forEach(n => n.remove());
+    }
+
+    function shortName(tag) { const p = tag.split(':'); return p[p.length - 1]; }
+    function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+    function drawAnnotations() {
+      clearCallouts();
+      if (!currentMarkers.length) return;
+
+      const sRect = stage.getBoundingClientRect();
+      const iRect = preview.getBoundingClientRect();
+      const cx = iRect.left - sRect.left + iRect.width / 2;
+      const cy = iRect.top - sRect.top + iRect.height / 2;
+      const hw = iRect.width / 2, hh = iRect.height / 2;
+      const sw = sRect.width, sh = sRect.height;
+
+      currentMarkers.forEach((m, i) => {
+        const ang = SLOTS[i % SLOTS.length];
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+
+        const tx = Math.abs(ca) < 1e-3 ? Infinity : hw / Math.abs(ca);
+        const ty = Math.abs(sa) < 1e-3 ? Infinity : hh / Math.abs(sa);
+        const t = Math.min(tx, ty);
+        const bx = cx + t * ca, by = cy + t * sa;
+
+        const lx = cx + (hw + 96) * ca;
+        const ly = cy + (hh + 74) * sa;
+
+        const el = document.createElement('div');
+        el.className = 'callout';
+        el.innerHTML = `<span class="ct">${esc(shortName(m.tag))}</span><span class="cv">${esc(trunc(m.value, 38))}</span>`;
+        stage.appendChild(el);
+        const lw = el.offsetWidth, lh = el.offsetHeight;
+
+        let left;
+        if (ca > 0.4) left = lx;
+        else if (ca < -0.4) left = lx - lw;
+        else left = lx - lw / 2;
+        let top = ly - lh / 2;
+
+        left = Math.max(4, Math.min(left, sw - lw - 4));
+        top = Math.max(4, Math.min(top, sh - lh - 4));
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+
+        const ax = Math.max(left, Math.min(cx, left + lw));
+        const ay = Math.max(top, Math.min(cy, top + lh));
+
+        const mxp = (bx + ax) / 2, myp = (by + ay) / 2;
+        const dx = ax - bx, dy = ay - by;
+        const len = Math.hypot(dx, dy) || 1;
+        const curve = 14;
+        const cxp = mxp + (-dy / len) * curve;
+        const cyp = myp + (dx / len) * curve;
+
+        const path = document.createElementNS(SVGNS, 'path');
+        path.setAttribute('class', 'conn');
+        path.setAttribute('d', `M ${bx} ${by} Q ${cxp} ${cyp} ${ax} ${ay}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', RED);
+        path.setAttribute('stroke-width', '1.7');
+        path.setAttribute('marker-end', 'url(#arrow)');
+        lines.appendChild(path);
+
+        const dot = document.createElementNS(SVGNS, 'circle');
+        dot.setAttribute('class', 'dot');
+        dot.setAttribute('cx', bx); dot.setAttribute('cy', by); dot.setAttribute('r', '2.8');
+        dot.setAttribute('fill', RED);
+        lines.appendChild(dot);
+      });
+    }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (currentMarkers.length) drawAnnotations(); }, 120);
+    });
+
+    btnInspect.addEventListener('click', () => { if (currentFile) inspect(); });
 
     btnClean.addEventListener('click', async () => {
       if (!currentFile) return;
-      errBox.style.display = 'none';
+      clearError();
       btnInspect.disabled = btnClean.disabled = true;
       const original = btnClean.textContent;
       btnClean.innerHTML = '<span class="spinner"></span> Limpando…';
@@ -204,10 +385,9 @@
         const blob = await res.blob();
         const cd = res.headers.get('Content-Disposition') || '';
         const match = cd.match(/filename="?([^"]+)"?/);
-        const name = match ? match[1] : 'imagem_limpa';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = name; a.click();
+        a.href = url; a.download = match ? match[1] : 'imagem_limpa'; a.click();
         URL.revokeObjectURL(url);
       } catch (err) {
         showError(err.message);
@@ -218,7 +398,7 @@
     });
 
     function esc(s) {
-      return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
     }
   </script>
 </body>

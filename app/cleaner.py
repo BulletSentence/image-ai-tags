@@ -145,22 +145,18 @@ def clean(input_path: str, output_path: str) -> None:
     """
     shutil.copyfile(input_path, output_path)
 
-    # -all= remove todos os metadados padrão.
-    # -trailer:all= e a remoção de JUMBF cuidam dos manifests C2PA.
+    # -all=          remove todos os metadados (EXIF/XMP/IPTC, text chunks de PNG, etc.)
+    # -trailer:all=  remove dados anexados depois da imagem (alguns manifests C2PA)
+    # -m             ignora avisos menores para não abortar a limpeza à toa
+    # O -all= também apaga os blocos JUMBF onde vive o Content Credentials/C2PA.
     proc = _run(
-        [
-            "-all=",
-            "-trailer:all=",
-            "--jumbf:all",  # garante que o handler JUMBF entre em ação
-            "-overwrite_original",
-            output_path,
-        ]
+        ["-all=", "-trailer:all=", "-m", "-overwrite_original", output_path]
     )
-    # Alguns formatos sem JUMBF fazem o exiftool reclamar do "--jumbf:all";
-    # nesse caso refaz só com -all=.
+    # Se a versão mais agressiva falhar (formato exótico), tenta só o -all=.
     if proc.returncode != 0:
-        proc = _run(["-all=", "-overwrite_original", output_path])
+        proc = _run(["-all=", "-m", "-overwrite_original", output_path])
         if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip().replace("\n", " ")
             raise RuntimeError(
-                f"ExifTool falhou ao limpar a imagem: {proc.stderr.strip()}"
+                f"ExifTool não conseguiu limpar a imagem: {detail or 'erro desconhecido'}"
             )
