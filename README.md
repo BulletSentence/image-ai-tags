@@ -5,6 +5,9 @@ an image through a web page, **inspects** it, and **removes the AI provenance
 metadata** that generators such as Gemini, ChatGPT/DALL-E, and Adobe Firefly
 embed into images they create or edit.
 
+<img width="1143" height="890" alt="image" src="https://github.com/user-attachments/assets/0da39df0-21ae-41fd-a299-4aba8bf985fc" />
+
+
 What gets removed:
 
 - **C2PA / "Content Credentials"** — signed manifests stored in JUMBF blocks.
