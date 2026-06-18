@@ -58,10 +58,12 @@ def create_app() -> Flask:
     @app.post("/clean")
     def clean():
         path = _save_upload()
+        deep = request.form.get("deep") in ("1", "true", "on")
+        strength = request.form.get("strength", "medio")
         base, ext = os.path.splitext(os.path.basename(path))
         out_path = os.path.join(app.config["WORK_DIR"], f"{base}_clean{ext}")
         try:
-            cleaner.clean(path, out_path)
+            cleaner.clean(path, out_path, deep=deep, strength=strength)
         except cleaner.ExifToolNotFound as err:
             _safe_remove(path); _safe_remove(out_path)
             return jsonify({"error": str(err)}), 503

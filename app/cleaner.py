@@ -1,20 +1,3 @@
-"""
-Inspeção e limpeza de metadados de imagens usando ExifTool.
-
-Os geradores de imagem por IA (Gemini, ChatGPT/DALL-E, Adobe Firefly, etc.)
-inserem marcadores em vários lugares dos metadados:
-
-- C2PA / "Content Credentials": manifests assinados embutidos em blocos JUMBF.
-- XMP `DigitalSourceType` = trainedAlgorithmicMedia / compositeSynthetic.
-- IPTC `DigitalSourceType`.
-- EXIF/XMP `Software` / `CreatorTool` (ex.: "Gemini", "OpenAI", "Firefly").
-- XMP `Credit` (ex.: "Made with Google AI").
-
-LIMITAÇÃO IMPORTANTE: marca d'água invisível embutida nos PIXELS (ex.: o
-SynthID do Google) NÃO é metadado e NÃO é removida aqui — só sairia
-re-encodando/degradando a própria imagem.
-"""
-
 from __future__ import annotations
 
 import json
@@ -138,12 +121,34 @@ def inspect(image_path: str) -> MetadataReport:
     return MetadataReport(all_tags=tags, ai_markers=markers)
 
 
-def clean(input_path: str, output_path: str) -> None:
+def clean(
+    input_path: str,
+    output_path: str,
+    deep: bool = False,
+    strength: str = "medio",
+) -> None:
     """
     Remove TODOS os metadados (EXIF/XMP/IPTC) e os manifests C2PA/JUMBF,
     gravando o resultado em output_path. A imagem original não é tocada.
+
+    Se `deep=True`, antes de tirar os metadados a imagem passa por um
+    re-processamento de pixels (best-effort) para tentar perturbar marcas
+    d'água invisíveis frágeis. NÃO garante remoção de marcas robustas como
+    o SynthID — veja app/watermark.py.
     """
-    shutil.copyfile(input_path, output_path)
+    if deep:
+        # Re-processa os pixels (grava já em output_path) e depois tira metadados.
+        from . import watermark
+
+        try:
+            watermark.disrupt(input_path, output_path, strength)
+        except Exception as err:  # Pillow não abriu/salvou (ex.: HEIC sem plugin)
+            raise RuntimeError(
+                f"Falha no re-processamento de pixels: {err}. "
+                "A limpeza profunda suporta JPG/PNG/WEBP/TIFF."
+            ) from err
+    else:
+        shutil.copyfile(input_path, output_path)
 
     # -all=          remove todos os metadados (EXIF/XMP/IPTC, text chunks de PNG, etc.)
     # -trailer:all=  remove dados anexados depois da imagem (alguns manifests C2PA)
